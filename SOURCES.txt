@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/local_llm_chat/__init__.py
+src/local_llm_chat/cli.py
+src/local_llm_chat/config.py
+src/local_llm_chat/modeling.py
+src/local_llm_chat/session.py
+src/local_llm_chat.egg-info/PKG-INFO
+src/local_llm_chat.egg-info/SOURCES.txt
+src/local_llm_chat.egg-info/dependency_links.txt
+src/local_llm_chat.egg-info/entry_points.txt
+src/local_llm_chat.egg-info/top_level.txt

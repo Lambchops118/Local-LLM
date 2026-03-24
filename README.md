@@ -1,0 +1,174 @@
+# Local LLM Chat for Apple Silicon
+
+This project is a local-only Python CLI chat app for running Hugging Face instruction-tuned LLMs on a MacBook with Apple Silicon. It defaults to Google Gemma 2 9B Instruct (`google/gemma-2-9b-it`), supports multi-turn conversation, keeps chat history in memory for the current session, and includes `/reset`, `/history`, `/help`, and `/exit` commands.
+
+The model backend is separated from chat/session logic so you can swap models by editing configuration instead of rewriting the app.
+
+## Project Layout
+
+```text
+.
+├── config/
+│   └── models.json
+├── requirements.txt
+├── pyproject.toml
+├── README.md
+└── src/
+    └── local_llm_chat/
+        ├── __init__.py
+        ├── cli.py
+        ├── config.py
+        ├── modeling.py
+        └── session.py
+```
+
+## Features
+
+- Runs Hugging Face models locally with `transformers` and `torch`
+- Defaults to Apple Silicon `mps` acceleration, then falls back to CPU
+- Uses a model profile config file so you can switch models without changing app code
+- Maintains a multi-turn in-memory session history
+- Automatically adapts system prompts for chat templates, like Gemma's, that do not accept a separate `system` role
+- Clean separation between:
+  - model loading and text generation
+  - session/history management
+  - CLI input/command handling
+- No hosted inference APIs and no remote streaming dependency
+
+## Requirements
+
+- macOS 12.3 or newer
+- Python 3.9+
+- Apple Silicon Mac
+- Enough unified memory for the model you choose
+- A Hugging Face account if you want to use gated models like Gemma
+
+## Setup
+
+1. Create and activate a virtual environment:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. Upgrade packaging tools and install dependencies:
+
+   ```bash
+   python -m pip install --upgrade pip setuptools wheel
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+3. Accept the Gemma license on Hugging Face and authenticate locally if needed:
+
+   ```bash
+   huggingface-cli login
+   ```
+
+   For `google/gemma-2-9b-it`, you must usually accept the model terms on the Hugging Face model page before the first download will work.
+
+4. Run the chat app:
+
+   ```bash
+   local-llm-chat
+   ```
+
+## Example Usage
+
+```text
+$ local-llm-chat
+Local LLM Chat
+Google Gemma 2 9B Instruct (google/gemma-2-9b-it) on mps using torch.float16
+Commands: /help, /reset, /history, /exit
+Enter a message to begin.
+
+You> Explain the difference between threads and processes.
+Assistant> Threads share a process's memory space, while processes are isolated execution environments...
+
+You> Give me a short Python example of each.
+Assistant> ...
+
+You> /history
+Session contains 2 user turn(s).
+
+You> /reset
+Session history cleared.
+
+You> /exit
+Goodbye.
+```
+
+## Switching Models by Configuration
+
+Edit [`config/models.json`](/Users/jacksal1/Desktop/Local LLM/config/models.json) and either:
+
+- change `active_profile`
+- add a new entry under `profiles`
+- or pass `--model-profile some_profile_name`
+
+Example profile:
+
+```json
+{
+  "active_profile": "gemma_9b_it",
+  "profiles": {
+    "gemma_9b_it": {
+      "label": "Google Gemma 2 9B Instruct",
+      "model_id": "google/gemma-2-9b-it",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": ["mps", "cpu"],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 512,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
+    }
+  }
+}
+```
+
+You can swap to a smaller model, another Hugging Face instruct model, or a local-cache-only setup without touching the chat loop.
+
+## CLI Options
+
+```bash
+local-llm-chat --help
+local-llm-chat --model-profile gemma_2b_it
+local-llm-chat --max-new-tokens 256
+local-llm-chat --temperature 0.3 --top-p 0.9
+local-llm-chat --system-prompt "You are a terse technical assistant."
+local-llm-chat --local-files-only
+```
+
+## Apple Silicon Notes
+
+- The app prefers `mps` automatically when PyTorch reports MPS support.
+- The default config uses `float16` on-device because it is typically the most practical choice on Apple Silicon for local inference.
+- Gemma 2 9B is a large model. As an inference-based estimate, 9 billion parameters at roughly 2 bytes per parameter is already about 18 GB for weights before runtime overhead like caches and activations. In practice, comfortable local inference usually needs noticeably more unified memory than that.
+- If your Mac has lower memory or you hit memory pressure, switch the active profile to the included `gemma_2b_it` example or reduce `max_new_tokens`.
+- Longer conversations increase prompt size, latency, and memory use because the full in-memory session history is resent to the model each turn.
+
+## How It Works
+
+- [`src/local_llm_chat/modeling.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/modeling.py) handles model selection, loading, device choice, dtype choice, and response generation.
+- [`src/local_llm_chat/session.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/session.py) stores conversation history and supports resetting the session cleanly.
+- [`src/local_llm_chat/cli.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/cli.py) provides the interactive REPL, command parsing, and runtime overrides.
+- [`src/local_llm_chat/config.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/config.py) loads model profiles from JSON so the app stays model-agnostic.
+
+## Notes on Local-Only Behavior
+
+- Inference is always local after the model files exist on disk.
+- The first run may download model weights from Hugging Face unless you use `--local-files-only` with a previously cached model.
+- No hosted generation API is used anywhere in the code.
+
+## Troubleshooting
+
+- If model loading fails with a gated-repo error, accept the model terms on Hugging Face and run `huggingface-cli login`.
+- If MPS is unavailable, PyTorch will fall back to CPU if your profile allows it.
+- If you see out-of-memory errors, try a smaller model, reduce `max_new_tokens`, or reset the conversation to shorten the prompt.

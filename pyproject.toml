@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-llm-chat"
+version = "0.1.0"
+description = "Local-only Hugging Face chat CLI for Apple Silicon Macs"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "OpenAI Codex" }
+]
+dependencies = []
+
+[project.scripts]
+local-llm-chat = "local_llm_chat.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

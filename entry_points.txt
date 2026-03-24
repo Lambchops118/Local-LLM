@@ -1,0 +1,2 @@
+[console_scripts]
+local-llm-chat = local_llm_chat.cli:main
