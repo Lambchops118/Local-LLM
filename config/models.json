@@ -1,7 +1,5 @@
 {
   "active_profile": "gemma_2b_it",
-
-
   "profiles": {
     "gemma_9b_it": {
       "label": "Google Gemma 2 9B Instruct",

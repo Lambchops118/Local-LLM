@@ -1,4 +1,14 @@
-.venv/
+.DS_Store
 .venv/
 venv/
 env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+PKG-INFO
+SOURCES.txt
+dependency_links.txt
+entry_points.txt
+top_level.txt

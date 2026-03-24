@@ -169,10 +169,19 @@ class TransformersChatModel:
 
         model.to(device)
         model.eval()
-        return cls(settings=settings, device=device, dtype=dtype, tokenizer=tokenizer, model=model)
+        return cls(
+            settings=settings,
+            device=device,
+            dtype=dtype,
+            tokenizer=tokenizer,
+            model=model,
+        )
 
     def describe_runtime(self) -> str:
-        return f"{self.settings.label} ({self.settings.model_id}) on {self.device.type} using {self.dtype}"
+        return (
+            f"{self.settings.label} ({self.settings.model_id}) "
+            f"on {self.device.type} using {self.dtype}"
+        )
 
     def _apply_chat_template(
         self,
