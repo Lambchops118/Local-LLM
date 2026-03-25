@@ -5,13 +5,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "local-llm-chat"
 version = "0.1.0"
-description = "Local-only Hugging Face chat CLI for Apple Silicon Macs"
+description = "Local-only pluggable chat CLI for Apple Silicon Macs"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
   { name = "OpenAI Codex" }
 ]
-dependencies = []
+dependencies = [
+  "torch>=2.3",
+  "transformers>=4.50.0",
+  "accelerate>=0.34",
+  "huggingface_hub>=0.24",
+  "safetensors>=0.4",
+  "sentencepiece>=0.2",
+  "mlx>=0.29.3; platform_system == 'Darwin' and platform_machine == 'arm64'",
+  "mlx-lm>=0.29.1; platform_system == 'Darwin' and platform_machine == 'arm64'",
+]
 
 [project.scripts]
 local-llm-chat = "local_llm_chat.cli:main"
