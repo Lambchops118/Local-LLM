@@ -1,8 +1,51 @@
 # Local LLM Chat for Apple Silicon
 
-This project is a local-only Python CLI chat app for running Hugging Face instruction-tuned LLMs on a MacBook with Apple Silicon. It defaults to Google Gemma 2 9B Instruct (`google/gemma-2-9b-it`), supports multi-turn conversation, keeps chat history in memory for the current session, and includes `/reset`, `/history`, `/help`, and `/exit` commands.
+This project is a local-only Python CLI chat app for running Gemma-class chat models on a Mac with Apple Silicon. It now uses a pluggable backend architecture:
 
-The model backend is separated from chat/session logic so you can swap models by editing configuration instead of rewriting the app.
+- `gemma_3_4b_it`: MLX + 4-bit text-tuned Gemma 3 4B
+- `gemma_3_12b_it`: MLX + 4-bit text-tuned Gemma 3 12B
+- `gemma_3_27b_it`: MLX + 4-bit text-tuned Gemma 3 27B
+- `gemma_9b_it`: MLX + 4-bit quantized Gemma 2 9B for the fastest local Apple Silicon path
+- `gemma_2b_it`: the existing Transformers + PyTorch path for Gemma 2 2B
+- `gemma_9b_it_transformers`: a legacy 9B FP16 fallback profile
+
+Multi-turn chat behavior is preserved, `/reset` now clears both chat history and backend-side prompt cache state, and all inference stays fully local once model files are on disk.
+
+Gemma 3 in this CLI is currently wired up through the `mlx-lm` text models, so these new profiles are usable for text chat only. The upstream Google Gemma 3 checkpoints are multimodal, but this app does not yet accept image input.
+
+## What Was Slowing Gemma 9B Down
+
+The original 9B path used `transformers` + PyTorch on `mps` with the full FP16 checkpoint. That leaves a few major bottlenecks on an M3:
+
+- about 18 GB of FP16 weights before runtime overhead
+- full-prompt recomputation on every turn
+- no persistent KV/prompt cache reuse between turns
+- a generic backend path that is correct, but not the fastest Apple Silicon-native inference stack
+
+For Gemma 9B on macOS, the best practical local path is usually MLX with an MLX-converted 4-bit checkpoint.
+
+## What Changed
+
+- Added a backend registry so models are selected by profile, not hard-coded loader logic.
+- Split the runtime layer into:
+  - `transformers` backend for the existing PyTorch/MPS flow
+  - `mlx` backend for Apple Silicon-optimized inference
+- Repointed the `gemma_9b_it` profile to `mlx-community/gemma-2-9b-it-4bit`.
+- Added incremental multi-turn prompt-cache reuse in the MLX backend so follow-up turns do not re-prefill the entire conversation.
+- Enabled configurable KV-cache quantization for the MLX profile to reduce longer-chat memory pressure.
+- Kept Gemma 2B support intact and added `gemma_9b_it_transformers` as a compatibility fallback.
+
+## Realistic Performance Target
+
+A warm 4-bit MLX Gemma 9B setup on an M3 can be much faster than the old FP16 Transformers path, especially on short follow-ups because prompt prefill is reused across turns.
+
+That said, around **300 ms for a complete 9B answer** is usually not realistic for normal multi-sentence generations. Around **300 ms to first visible output** or **very short warm-cache replies** can be realistic; full answers will still commonly land in the sub-second to multi-second range depending on prompt length, response length, and memory bandwidth.
+
+The biggest wins here are:
+
+- lower memory footprint
+- better Apple Silicon kernel performance through MLX
+- much less repeated prompt work on follow-up turns
 
 ## Project Layout
 
@@ -15,33 +58,22 @@ The model backend is separated from chat/session logic so you can swap models by
 ├── README.md
 └── src/
     └── local_llm_chat/
-        ├── __init__.py
+        ├── backends/
+        │   ├── base.py
+        │   ├── mlx_backend.py
+        │   └── transformers_backend.py
         ├── cli.py
         ├── config.py
         ├── modeling.py
         └── session.py
 ```
 
-## Features
-
-- Runs Hugging Face models locally with `transformers` and `torch`
-- Defaults to Apple Silicon `mps` acceleration, then falls back to CPU
-- Uses a model profile config file so you can switch models without changing app code
-- Maintains a multi-turn in-memory session history
-- Automatically adapts system prompts for chat templates, like Gemma's, that do not accept a separate `system` role
-- Clean separation between:
-  - model loading and text generation
-  - session/history management
-  - CLI input/command handling
-- No hosted inference APIs and no remote streaming dependency
-
 ## Requirements
 
-- macOS 12.3 or newer
+- macOS on Apple Silicon
 - Python 3.9+
-- Apple Silicon Mac
-- Enough unified memory for the model you choose
-- A Hugging Face account if you want to use gated models like Gemma
+- enough unified memory for the selected model
+- a Hugging Face account for Gemma-licensed model downloads
 
 ## Setup
 
@@ -52,7 +84,7 @@ The model backend is separated from chat/session logic so you can swap models by
    source .venv/bin/activate
    ```
 
-2. Upgrade packaging tools and install dependencies:
+2. Install dependencies:
 
    ```bash
    python -m pip install --upgrade pip setuptools wheel
@@ -60,115 +92,107 @@ The model backend is separated from chat/session logic so you can swap models by
    pip install -e .
    ```
 
-3. Accept the Gemma license on Hugging Face and authenticate locally if needed:
+3. Accept the Gemma license and authenticate locally if needed:
 
    ```bash
    huggingface-cli login
    ```
 
-   For `google/gemma-2-9b-it`, you must usually accept the model terms on the Hugging Face model page before the first download will work.
-
-4. Run the chat app:
+4. Run the app:
 
    ```bash
    local-llm-chat
    ```
 
+## Profiles
+
+The shipped config currently defaults to `gemma_9b_it`, and you can switch to any profile at launch:
+
+```bash
+local-llm-chat --model-profile gemma_3_4b_it
+local-llm-chat --model-profile gemma_3_12b_it
+local-llm-chat --model-profile gemma_3_27b_it
+local-llm-chat --model-profile gemma_9b_it
+```
+
+Available profiles:
+
+- `gemma_3_4b_it`: MLX 4-bit Gemma 3 4B text chat
+- `gemma_3_12b_it`: MLX 4-bit Gemma 3 12B text chat
+- `gemma_3_27b_it`: MLX 4-bit Gemma 3 27B text chat
+- `gemma_9b_it`: MLX 4-bit Gemma 2 9B
+- `gemma_2b_it`: Transformers Gemma 2 2B
+- `gemma_9b_it_transformers`: legacy FP16 9B fallback
+
 ## Example Usage
 
 ```text
-$ local-llm-chat
+$ local-llm-chat --model-profile gemma_3_4b_it
 Local LLM Chat
-Google Gemma 2 9B Instruct (google/gemma-2-9b-it) on mps using torch.float16
+Google Gemma 3 4B Instruct MLX 4-bit (mlx-community/gemma-3-text-4b-it-4bit) on apple-silicon via mlx using 4-bit quantized weights
 Commands: /help, /reset, /history, /exit
 Enter a message to begin.
 
-You> Explain the difference between threads and processes.
-Assistant> Threads share a process's memory space, while processes are isolated execution environments...
-
-You> Give me a short Python example of each.
-Assistant> ...
-
-You> /history
-Session contains 2 user turn(s).
-
-You> /reset
-Session history cleared.
-
-You> /exit
-Goodbye.
+You> Explain what a mutex does in one paragraph.
+Assistant> A mutex is a synchronization primitive that allows only one thread at a time to enter a critical section...
 ```
 
-## Switching Models by Configuration
+## Configuration
 
-Edit [`config/models.json`](/Users/jacksal1/Desktop/Local LLM/config/models.json) and either:
+Profiles are defined in [`config/models.json`](/Users/jacksal1/Desktop/Local LLM/config/models.json).
 
-- change `active_profile`
-- add a new entry under `profiles`
-- or pass `--model-profile some_profile_name`
+Key fields:
 
-Example profile:
+- `backend`: `transformers` or `mlx`
+- `model_id`: Hugging Face repo or local model path
+- `backend_options`: backend-specific tuning knobs
+
+The Gemma 3 MLX profiles use the same prompt-cache and KV-cache tuning approach as the optimized Gemma 2 9B profile:
 
 ```json
 {
-  "active_profile": "gemma_9b_it",
-  "profiles": {
-    "gemma_9b_it": {
-      "label": "Google Gemma 2 9B Instruct",
-      "model_id": "google/gemma-2-9b-it",
-      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
-      "torch_dtype": "float16",
-      "device_preference": ["mps", "cpu"],
-      "local_files_only": false,
-      "max_context_messages": null,
-      "generation": {
-        "max_new_tokens": 512,
-        "temperature": 0.7,
-        "top_p": 0.95,
-        "do_sample": true,
-        "repetition_penalty": 1.05
-      }
-    }
+  "backend": "mlx",
+  "model_id": "mlx-community/gemma-3-text-4b-it-4bit",
+  "backend_options": {
+    "prefill_step_size": 1024,
+    "kv_bits": 4,
+    "kv_group_size": 64,
+    "quantized_kv_start": 1024
   }
 }
 ```
-
-You can swap to a smaller model, another Hugging Face instruct model, or a local-cache-only setup without touching the chat loop.
 
 ## CLI Options
 
 ```bash
 local-llm-chat --help
+local-llm-chat --model-profile gemma_3_4b_it
+local-llm-chat --model-profile gemma_3_12b_it
+local-llm-chat --model-profile gemma_3_27b_it
+local-llm-chat --model-profile gemma_9b_it
 local-llm-chat --model-profile gemma_2b_it
-local-llm-chat --max-new-tokens 256
-local-llm-chat --temperature 0.3 --top-p 0.9
-local-llm-chat --system-prompt "You are a terse technical assistant."
 local-llm-chat --local-files-only
+local-llm-chat --offline
+local-llm-chat --max-new-tokens 128
+local-llm-chat --temperature 0.2 --top-p 0.9
 ```
 
-## Apple Silicon Notes
+## Local-Only Behavior
 
-- The app prefers `mps` automatically when PyTorch reports MPS support.
-- The default config uses `float16` on-device because it is typically the most practical choice on Apple Silicon for local inference.
-- Gemma 2 9B is a large model. As an inference-based estimate, 9 billion parameters at roughly 2 bytes per parameter is already about 18 GB for weights before runtime overhead like caches and activations. In practice, comfortable local inference usually needs noticeably more unified memory than that.
-- If your Mac has lower memory or you hit memory pressure, switch the active profile to the included `gemma_2b_it` example or reduce `max_new_tokens`.
-- Longer conversations increase prompt size, latency, and memory use because the full in-memory session history is resent to the model each turn.
+- Inference is local after model files exist in the local Hugging Face cache.
+- The first load of an uncached model may download weights from Hugging Face.
+- `--local-files-only` and `--offline` still work for both backends.
 
-## How It Works
+## Notes
 
-- [`src/local_llm_chat/modeling.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/modeling.py) handles model selection, loading, device choice, dtype choice, and response generation.
-- [`src/local_llm_chat/session.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/session.py) stores conversation history and supports resetting the session cleanly.
-- [`src/local_llm_chat/cli.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/cli.py) provides the interactive REPL, command parsing, and runtime overrides.
-- [`src/local_llm_chat/config.py`](/Users/jacksal1/Desktop/Local LLM/src/local_llm_chat/config.py) loads model profiles from JSON so the app stays model-agnostic.
-
-## Notes on Local-Only Behavior
-
-- Inference is always local after the model files exist on disk.
-- The first run may download model weights from Hugging Face unless you use `--local-files-only` with a previously cached model.
-- No hosted generation API is used anywhere in the code.
+- MLX is the preferred backend for large Apple Silicon-local Gemma models.
+- Gemma 3 support here uses the `mlx-community/gemma-3-text-*-it-4bit` conversions because the CLI currently handles text chat, not image input.
+- The MLX backend reuses prompt cache across turns, so short follow-up messages benefit more than cold-start prompts.
+- If you want the old PyTorch/MPS path for 9B, use `--model-profile gemma_9b_it_transformers`.
+- Longer chats still consume more memory and latency, especially if you keep unlimited context.
 
 ## Troubleshooting
 
-- If model loading fails with a gated-repo error, accept the model terms on Hugging Face and run `huggingface-cli login`.
-- If MPS is unavailable, PyTorch will fall back to CPU if your profile allows it.
-- If you see out-of-memory errors, try a smaller model, reduce `max_new_tokens`, or reset the conversation to shorten the prompt.
+- If the MLX backend cannot find the quantized model locally, run once without `--local-files-only` to download it.
+- If Gemma access fails, accept the model terms on Hugging Face and run `huggingface-cli login`.
+- If you hit memory pressure, reduce `--max-new-tokens`, reset the chat, or switch to a smaller profile such as `gemma_3_4b_it` or `gemma_2b_it`.

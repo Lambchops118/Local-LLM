@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -33,12 +33,14 @@ class ModelSettings:
     name: str
     label: str
     model_id: str
+    backend: str
     system_prompt: Optional[str]
     torch_dtype: str
     device_preference: list[str]
     local_files_only: bool
     max_context_messages: Optional[int]
     generation: GenerationSettings
+    backend_options: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(
@@ -50,11 +52,13 @@ class ModelSettings:
             name=name,
             label=str(payload.get("label", name)),
             model_id=str(payload["model_id"]),
+            backend=str(payload.get("backend", "transformers")),
             system_prompt=payload.get("system_prompt"),
             torch_dtype=str(payload.get("torch_dtype", "auto")),
             device_preference=list(payload.get("device_preference", ["mps", "cpu"])),
             local_files_only=bool(payload.get("local_files_only", False)),
             max_context_messages=payload.get("max_context_messages"),
+            backend_options=dict(payload.get("backend_options", {})),
             generation=GenerationSettings.from_dict(payload.get("generation", {})),
         )
 

@@ -11,7 +11,7 @@ from .config import AppConfig, DEFAULT_CONFIG_PATH
 from .session import ChatSession
 
 if TYPE_CHECKING:
-    from .modeling import TransformersChatModel
+    from .modeling import ChatModel
 
 
 COMMANDS = {
@@ -68,14 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def print_banner(model: "TransformersChatModel") -> None:
+def print_banner(model: "ChatModel") -> None:
     print("Local LLM Chat")
     print(model.describe_runtime())
     print("Commands: " + ", ".join(COMMANDS))
     print("Enter a message to begin.\n")
 
 
-def handle_command(raw_text: str, session: ChatSession) -> bool:
+def handle_command(raw_text: str, session: ChatSession, model: "ChatModel") -> bool:
     command = raw_text.strip().lower()
     if command == "/help":
         for name, description in COMMANDS.items():
@@ -83,6 +83,7 @@ def handle_command(raw_text: str, session: ChatSession) -> bool:
         return True
     if command == "/reset":
         session.reset()
+        model.reset_session()
         print("Session history cleared.")
         return True
     if command == "/history":
@@ -95,7 +96,7 @@ def handle_command(raw_text: str, session: ChatSession) -> bool:
 
 
 def chat_loop(
-    model: "TransformersChatModel",
+    model: "ChatModel",
     session: ChatSession,
     *,
     max_new_tokens: Optional[int] = None,
@@ -122,22 +123,30 @@ def chat_loop(
         if not user_text:
             continue
         if user_text.startswith("/"):
-            handle_command(user_text, session)
+            handle_command(user_text, session, model)
             continue
 
         session.add_user_message(user_text)
         started_at = time.perf_counter()
+        first_chunk_ms: Optional[float] = None
+        response_parts: list[str] = []
+        print("Assistant> ", end="", flush=True)
         try:
-            response = model.generate_response(
+            for chunk in model.stream_response(
                 session.prompt_messages(model.settings.max_context_messages),
                 overrides=generation,
-            )
+            ):
+                if first_chunk_ms is None:
+                    first_chunk_ms = (time.perf_counter() - started_at) * 1000
+                response_parts.append(chunk)
+                print(chunk, end="", flush=True)
         except KeyboardInterrupt:
             session.remove_last_message()
-            print("\nGeneration cancelled.")
+            print("\nGeneration cancelled.\n")
             continue
         except RuntimeError as exc:
             session.remove_last_message()
+            print()
             if "out of memory" in str(exc).lower():
                 print(
                     "Generation failed due to memory pressure. Try `/reset`, reduce "
@@ -147,10 +156,14 @@ def chat_loop(
                 print(f"Generation failed: {exc}")
             continue
 
+        response = "".join(response_parts).strip()
         elapsed_ms = (time.perf_counter() - started_at) * 1000
+        if first_chunk_ms is None:
+            first_chunk_ms = elapsed_ms
         session.add_assistant_message(response)
-        print(f"Assistant> {response}\n")
-        print(f"Latency: {elapsed_ms:.2f} ms\n")
+        print("\n")
+        print(f"Time to first token: {first_chunk_ms:.2f} ms")
+        print(f"Time to completion: {elapsed_ms:.2f} ms\n")
 
 
 def main() -> None:
@@ -160,7 +173,7 @@ def main() -> None:
     try:
         import torch
 
-        from .modeling import ModelLoadError, TransformersChatModel
+        from .modeling import ModelLoadError, load_chat_model
     except ModuleNotFoundError as exc:
         print(
             "Error: missing runtime dependencies. Install them with "
@@ -181,7 +194,7 @@ def main() -> None:
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
         if args.system_prompt is not None:
             settings.system_prompt = args.system_prompt
-        model = TransformersChatModel.load(settings)
+        model = load_chat_model(settings)
     except (ModelLoadError, KeyError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
