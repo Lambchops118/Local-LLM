@@ -1,6 +1,6 @@
 # Local LLM Chat for Apple Silicon
 
-This project is a local-only Python CLI chat app for running Gemma-class chat models on a Mac with Apple Silicon. It now uses a pluggable backend architecture:
+This project is a local-only Python CLI chat app for running chat-oriented Hugging Face models on a Mac with Apple Silicon. It now uses a pluggable backend architecture:
 
 - `gemma_3_4b_it`: MLX + 4-bit text-tuned Gemma 3 4B
 - `gemma_3_12b_it`: MLX + 4-bit text-tuned Gemma 3 12B
@@ -8,6 +8,10 @@ This project is a local-only Python CLI chat app for running Gemma-class chat mo
 - `gemma_9b_it`: MLX + 4-bit quantized Gemma 2 9B for the fastest local Apple Silicon path
 - `gemma_2b_it`: the existing Transformers + PyTorch path for Gemma 2 2B
 - `gemma_9b_it_transformers`: a legacy 9B FP16 fallback profile
+- `llama3_8b`: Transformers + PyTorch path for Meta Llama 3 8B Instruct
+- `mistral_7b`: Transformers + PyTorch path for Mistral 7B Instruct
+- `phi_3`: Transformers + PyTorch path for Phi-3 Mini 4K Instruct
+- `mixtral_8x7b`: Transformers + PyTorch path for Mixtral 8x7B Instruct
 
 Multi-turn chat behavior is preserved, `/reset` now clears both chat history and backend-side prompt cache state, and all inference stays fully local once model files are on disk.
 
@@ -113,6 +117,10 @@ local-llm-chat --model-profile gemma_3_4b_it
 local-llm-chat --model-profile gemma_3_12b_it
 local-llm-chat --model-profile gemma_3_27b_it
 local-llm-chat --model-profile gemma_9b_it
+local-llm-chat --model-profile llama3_8b
+local-llm-chat --model-profile mistral_7b
+local-llm-chat --model-profile phi_3
+local-llm-chat --model-profile mixtral_8x7b
 ```
 
 Available profiles:
@@ -123,6 +131,10 @@ Available profiles:
 - `gemma_9b_it`: MLX 4-bit Gemma 2 9B
 - `gemma_2b_it`: Transformers Gemma 2 2B
 - `gemma_9b_it_transformers`: legacy FP16 9B fallback
+- `llama3_8b`: Transformers Meta Llama 3 8B Instruct
+- `mistral_7b`: Transformers Mistral 7B Instruct
+- `phi_3`: Transformers Microsoft Phi-3 Mini 4K Instruct
+- `mixtral_8x7b`: Transformers Mixtral 8x7B Instruct
 
 ## Example Usage
 
@@ -171,6 +183,10 @@ local-llm-chat --model-profile gemma_3_12b_it
 local-llm-chat --model-profile gemma_3_27b_it
 local-llm-chat --model-profile gemma_9b_it
 local-llm-chat --model-profile gemma_2b_it
+local-llm-chat --model-profile llama3_8b
+local-llm-chat --model-profile mistral_7b
+local-llm-chat --model-profile phi_3
+local-llm-chat --model-profile mixtral_8x7b
 local-llm-chat --local-files-only
 local-llm-chat --offline
 local-llm-chat --max-new-tokens 128
@@ -187,6 +203,7 @@ local-llm-chat --temperature 0.2 --top-p 0.9
 
 - MLX is the preferred backend for large Apple Silicon-local Gemma models.
 - Gemma 3 support here uses the `mlx-community/gemma-3-text-*-it-4bit` conversions because the CLI currently handles text chat, not image input.
+- The added Llama, Mistral, Phi, and Mixtral profiles use the generic `transformers` backend and rely on each model repo's chat template support.
 - The MLX backend reuses prompt cache across turns, so short follow-up messages benefit more than cold-start prompts.
 - If you want the old PyTorch/MPS path for 9B, use `--model-profile gemma_9b_it_transformers`.
 - Longer chats still consume more memory and latency, especially if you keep unlimited context.
@@ -195,4 +212,5 @@ local-llm-chat --temperature 0.2 --top-p 0.9
 
 - If the MLX backend cannot find the quantized model locally, run once without `--local-files-only` to download it.
 - If Gemma access fails, accept the model terms on Hugging Face and run `huggingface-cli login`.
+- If Llama or another licensed model fails to download, accept its Hugging Face terms and authenticate with `huggingface-cli login`.
 - If you hit memory pressure, reduce `--max-new-tokens`, reset the chat, or switch to a smaller profile such as `gemma_3_4b_it` or `gemma_2b_it`.

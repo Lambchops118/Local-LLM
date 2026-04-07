@@ -144,6 +144,86 @@
         "do_sample": true,
         "repetition_penalty": 1.05
       }
+    },
+    "llama3_8b": {
+      "label": "Meta Llama 3 8B Instruct",
+      "model_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 384,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
+    },
+    "mistral_7b": {
+      "label": "Mistral 7B Instruct v0.3",
+      "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 384,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
+    },
+    "phi_3": {
+      "label": "Microsoft Phi-3 Mini 4K Instruct",
+      "model_id": "microsoft/Phi-3-mini-4k-instruct",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 384,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
+    },
+    "mixtral_8x7b": {
+      "label": "Mixtral 8x7B Instruct v0.1",
+      "model_id": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 256,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
     }
   }
 }
