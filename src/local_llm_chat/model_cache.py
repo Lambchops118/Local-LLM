@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from dataclasses import dataclass
@@ -123,6 +124,40 @@ def delete_cached_model(model_id: str, cache_root: Path | None = None) -> Path |
         return None
     shutil.rmtree(cache_dir)
     return cache_dir
+
+
+def load_deleted_model_ids(state_path: Path) -> set[str]:
+    if not state_path.is_file():
+        return set()
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return set()
+
+    model_ids = payload.get("model_ids", [])
+    if not isinstance(model_ids, list):
+        return set()
+    return {str(model_id) for model_id in model_ids}
+
+
+def save_deleted_model_ids(state_path: Path, model_ids: set[str]) -> None:
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"model_ids": sorted(model_ids)}
+    state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def mark_model_deleted(model_id: str, state_path: Path) -> None:
+    model_ids = load_deleted_model_ids(state_path)
+    model_ids.add(model_id)
+    save_deleted_model_ids(state_path, model_ids)
+
+
+def unmark_model_deleted(model_id: str, state_path: Path) -> None:
+    model_ids = load_deleted_model_ids(state_path)
+    if model_id not in model_ids:
+        return
+    model_ids.remove(model_id)
+    save_deleted_model_ids(state_path, model_ids)
 
 
 def format_bytes(size_bytes: int) -> str:

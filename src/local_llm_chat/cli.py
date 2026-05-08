@@ -13,7 +13,10 @@ from .model_cache import (
     describe_cached_model,
     format_bytes,
     list_cached_model_repos,
+    load_deleted_model_ids,
+    mark_model_deleted,
     resolve_hf_cache_root,
+    unmark_model_deleted,
 )
 from .session import ChatSession
 
@@ -73,9 +76,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Force fully offline mode using only the local Hugging Face cache.",
     )
     parser.add_argument(
+        "--list-models",
+        dest="list_downloaded_models",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--list-downloaded-models",
         action="store_true",
-        help="List configured models that are already downloaded in the local Hugging Face cache.",
+        help="List configured models and show whether each is downloaded, deleted, or not downloaded.",
     )
     parser.add_argument(
         "--delete-downloaded-model",
@@ -188,16 +197,29 @@ def chat_loop(
         print(f"Time to completion: {elapsed_ms:.2f} ms\n")
 
 
-def print_downloaded_models(config: AppConfig) -> None:
+def deleted_models_state_path(config_path: Path) -> Path:
+    return config_path.expanduser().resolve().parent / ".deleted-models.json"
+
+
+def print_downloaded_models(config: AppConfig, *, deleted_state_path: Path) -> None:
     cache_root = resolve_hf_cache_root()
     cached_repos = {repo.repo_id: repo for repo in list_cached_model_repos(cache_root)}
+    deleted_model_ids = load_deleted_model_ids(deleted_state_path)
 
     print(f"Hugging Face cache: {cache_root}")
     print()
     print("Configured profiles:")
     for profile_name, settings in config.profiles.items():
         cached = describe_cached_model(settings.model_id, cache_root=cache_root)
-        status = "downloaded" if cached else "not downloaded"
+        if cached:
+            status = "downloaded"
+            if settings.model_id in deleted_model_ids:
+                unmark_model_deleted(settings.model_id, deleted_state_path)
+                deleted_model_ids.discard(settings.model_id)
+        elif settings.model_id in deleted_model_ids:
+            status = "deleted"
+        else:
+            status = "not downloaded"
         size = format_bytes(cached.size_bytes) if cached else "-"
         active_marker = "*" if profile_name == config.active_profile else " "
         print(
@@ -259,11 +281,15 @@ def handle_cache_command(args: argparse.Namespace) -> bool:
         raise SystemExit(1) from exc
 
     if args.list_downloaded_models:
-        print_downloaded_models(config)
+        print_downloaded_models(
+            config,
+            deleted_state_path=deleted_models_state_path(args.config),
+        )
         return True
 
     target = str(args.delete_downloaded_model)
     cache_root = resolve_hf_cache_root()
+    deleted_state_path = deleted_models_state_path(args.config)
     model_id, referencing_profiles = resolve_delete_target(target, config)
     cached = describe_cached_model(model_id, cache_root=cache_root)
     if cached is None:
@@ -289,6 +315,7 @@ def handle_cache_command(args: argparse.Namespace) -> bool:
         )
         raise SystemExit(1)
 
+    mark_model_deleted(model_id, deleted_state_path)
     print(f"Deleted cached model '{model_id}' from {deleted_path}")
     return True
 

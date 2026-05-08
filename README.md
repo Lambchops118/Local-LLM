@@ -199,11 +199,13 @@ You can inspect and delete locally cached model downloads without starting the c
 
 ```bash
 local-llm-chat --list-downloaded-models
+local-llm-chat --list-models
 local-llm-chat --delete-downloaded-model gemma_3_27b_it
 local-llm-chat --delete-downloaded-model mlx-community/gemma-3-text-27b-it-4bit --yes
 ```
 
-- `--list-downloaded-models` shows configured profiles and whether each model is already present in the local Hugging Face cache.
+- `--list-downloaded-models` shows configured profiles and whether each model is `downloaded`, `deleted`, or `not downloaded`.
+- `--list-models` is an alias for `--list-downloaded-models`.
 - `--delete-downloaded-model` accepts either a profile name or an exact Hugging Face model id.
 - `--yes` skips the deletion confirmation prompt.
 
