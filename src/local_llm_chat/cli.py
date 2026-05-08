@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 from .config import AppConfig, DEFAULT_CONFIG_PATH
+from .model_cache import (
+    delete_cached_model,
+    describe_cached_model,
+    format_bytes,
+    list_cached_model_repos,
+    resolve_hf_cache_root,
+)
 from .session import ChatSession
 
 if TYPE_CHECKING:
@@ -64,6 +71,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="Force fully offline mode using only the local Hugging Face cache.",
+    )
+    parser.add_argument(
+        "--list-downloaded-models",
+        action="store_true",
+        help="List configured models that are already downloaded in the local Hugging Face cache.",
+    )
+    parser.add_argument(
+        "--delete-downloaded-model",
+        metavar="PROFILE_OR_MODEL_ID",
+        help="Delete one cached model by profile name or exact Hugging Face model id.",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompts for destructive cache actions.",
     )
     return parser
 
@@ -166,9 +188,117 @@ def chat_loop(
         print(f"Time to completion: {elapsed_ms:.2f} ms\n")
 
 
+def print_downloaded_models(config: AppConfig) -> None:
+    cache_root = resolve_hf_cache_root()
+    cached_repos = {repo.repo_id: repo for repo in list_cached_model_repos(cache_root)}
+
+    print(f"Hugging Face cache: {cache_root}")
+    print()
+    print("Configured profiles:")
+    for profile_name, settings in config.profiles.items():
+        cached = describe_cached_model(settings.model_id, cache_root=cache_root)
+        status = "downloaded" if cached else "not downloaded"
+        size = format_bytes(cached.size_bytes) if cached else "-"
+        active_marker = "*" if profile_name == config.active_profile else " "
+        print(
+            f"{active_marker} {profile_name:<26} {status:<14} "
+            f"{size:<8} {settings.model_id}"
+        )
+
+    configured_ids = {settings.model_id for settings in config.profiles.values()}
+    extra_repos = [repo for repo_id, repo in cached_repos.items() if repo_id not in configured_ids]
+    if not extra_repos:
+        return
+
+    print()
+    print("Other cached model repos:")
+    for repo in extra_repos:
+        print(
+            f"  {repo.repo_id:<42} "
+            f"{format_bytes(repo.size_bytes):<8} {repo.cache_dir}"
+        )
+
+
+def resolve_delete_target(
+    target: str,
+    config: AppConfig,
+) -> tuple[str, list[str]]:
+    if target in config.profiles:
+        model_id = config.profiles[target].model_id
+    else:
+        model_id = target
+
+    referencing_profiles = [
+        name for name, settings in config.profiles.items() if settings.model_id == model_id
+    ]
+    return model_id, referencing_profiles
+
+
+def confirm_delete(
+    model_id: str,
+    cache_path: Path,
+    referencing_profiles: list[str],
+) -> bool:
+    print(f"About to delete cached model: {model_id}")
+    if referencing_profiles:
+        profiles = ", ".join(referencing_profiles)
+        print(f"Referenced by profile(s): {profiles}")
+    print(f"Cache path: {cache_path}")
+    response = input("Continue? [y/N]: ").strip().lower()
+    return response in {"y", "yes"}
+
+
+def handle_cache_command(args: argparse.Namespace) -> bool:
+    if not args.list_downloaded_models and not args.delete_downloaded_model:
+        return False
+
+    try:
+        config = AppConfig.load(args.config)
+    except (KeyError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    if args.list_downloaded_models:
+        print_downloaded_models(config)
+        return True
+
+    target = str(args.delete_downloaded_model)
+    cache_root = resolve_hf_cache_root()
+    model_id, referencing_profiles = resolve_delete_target(target, config)
+    cached = describe_cached_model(model_id, cache_root=cache_root)
+    if cached is None:
+        print(
+            f"Error: no downloaded cache entry was found for '{target}' in {cache_root}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    if not args.yes and not confirm_delete(
+        model_id=model_id,
+        cache_path=cached.cache_dir,
+        referencing_profiles=referencing_profiles,
+    ):
+        print("Cancelled.")
+        return True
+
+    deleted_path = delete_cached_model(model_id, cache_root=cache_root)
+    if deleted_path is None:
+        print(
+            f"Error: cache path disappeared before deletion: {cached.cache_dir}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    print(f"Deleted cached model '{model_id}' from {deleted_path}")
+    return True
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    if handle_cache_command(args):
+        return
 
     try:
         import torch

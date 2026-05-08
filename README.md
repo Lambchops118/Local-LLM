@@ -193,6 +193,20 @@ local-llm-chat --max-new-tokens 128
 local-llm-chat --temperature 0.2 --top-p 0.9
 ```
 
+## Managing Downloaded Models
+
+You can inspect and delete locally cached model downloads without starting the chat UI:
+
+```bash
+local-llm-chat --list-downloaded-models
+local-llm-chat --delete-downloaded-model gemma_3_27b_it
+local-llm-chat --delete-downloaded-model mlx-community/gemma-3-text-27b-it-4bit --yes
+```
+
+- `--list-downloaded-models` shows configured profiles and whether each model is already present in the local Hugging Face cache.
+- `--delete-downloaded-model` accepts either a profile name or an exact Hugging Face model id.
+- `--yes` skips the deletion confirmation prompt.
+
 ## Local-Only Behavior
 
 - Inference is local after model files exist in the local Hugging Face cache.
