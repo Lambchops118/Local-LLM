@@ -1,5 +1,5 @@
 .DS_Store
-.venv/
+.venv*/
 venv/
 env/
 __pycache__/
@@ -12,3 +12,4 @@ SOURCES.txt
 dependency_links.txt
 entry_points.txt
 top_level.txt
+.deleted-models.json

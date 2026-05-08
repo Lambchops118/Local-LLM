@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from threading import Event, Thread
+import sys
 from typing import Optional
 
 import torch
@@ -55,6 +56,11 @@ def is_unknown_model_architecture_error(exc: BaseException) -> bool:
         or "unrecognized configuration class" in message
         or "model type `gemma4`" in message
     )
+
+
+def is_gemma4_model_id(model_id: str) -> bool:
+    normalized = model_id.lower()
+    return "/gemma-4" in normalized or normalized.startswith("gemma-4")
 
 
 def select_device(device_preference: list[str]) -> torch.device:
@@ -117,6 +123,13 @@ class TransformersChatModel(BaseChatModel):
     def load(cls, settings: ModelSettings) -> "TransformersChatModel":
         device = select_device(settings.device_preference)
         dtype = resolve_dtype(settings.torch_dtype, device)
+        if is_gemma4_model_id(settings.model_id) and sys.version_info < (3, 10):
+            raise ModelLoadError(
+                "Gemma 4 profiles require Python 3.10+ because the supported "
+                "`transformers` builds for the `gemma4` architecture do not publish "
+                "Python 3.9 wheels. Create a Python 3.10+ virtual environment, "
+                "install the project dependencies there, then retry."
+            )
 
         def load_artifacts(local_files_only: bool):
             model_ref = settings.model_id
@@ -176,8 +189,9 @@ class TransformersChatModel(BaseChatModel):
                 raise ModelLoadError(
                     "This installed `transformers` version is too old for this model "
                     "architecture. Gemma 4 models require a newer Transformers build. "
-                    "Upgrade with `pip install --upgrade 'transformers>=5.5.0'` inside "
-                    "your virtual environment, then retry."
+                    "If this environment is on Python 3.9, first recreate it with "
+                    "Python 3.10+; then upgrade with "
+                    "`pip install --upgrade 'transformers>=5.5.0'` and retry."
                 ) from exc
             raise
 

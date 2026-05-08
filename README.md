@@ -80,7 +80,7 @@ The biggest wins here are:
 - Python 3.9+
 - enough unified memory for the selected model
 - a Hugging Face account for Gemma-licensed model downloads
-- `transformers>=5.5.0` if you want to use the Gemma 4 profiles
+- Python 3.10+ and `transformers>=5.5.0` if you want to use the Gemma 4 profiles
 
 ## Setup
 
@@ -230,7 +230,7 @@ local-llm-chat --delete-downloaded-model mlx-community/gemma-3-text-27b-it-4bit 
 - Gemma 3 support here uses the `mlx-community/gemma-3-text-*-it-4bit` conversions because the CLI currently handles text chat, not image input.
 - The added Llama, Mistral, Phi, and Mixtral profiles use the generic `transformers` backend and rely on each model repo's chat template support.
 - The Gemma 4 profiles currently use the generic `transformers` backend for text chat. The upstream models are multimodal, but this CLI does not yet pass image or audio inputs.
-- Gemma 4 support depends on a newer Hugging Face `transformers` build than older Gemma 2 and Llama setups. If a Gemma 4 profile errors with an unrecognized `gemma4` architecture, upgrade inside the venv with `pip install --upgrade 'transformers>=5.5.0'`.
+- Gemma 4 support depends on Python 3.10+ and a newer Hugging Face `transformers` build than older Gemma 2 and Llama setups. If a Gemma 4 profile errors with an unrecognized `gemma4` architecture, recreate the venv on Python 3.10+ and then upgrade inside it with `pip install --upgrade 'transformers>=5.5.0'`.
 - The MLX backend reuses prompt cache across turns, so short follow-up messages benefit more than cold-start prompts.
 - If you want the old PyTorch/MPS path for 9B, use `--model-profile gemma_9b_it_transformers`.
 - Longer chats still consume more memory and latency, especially if you keep unlimited context.

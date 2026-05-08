@@ -332,8 +332,10 @@ def main() -> None:
 
         from .modeling import ModelLoadError, load_chat_model
     except ModuleNotFoundError as exc:
+        missing_name = exc.name or "an unknown package"
         print(
-            "Error: missing runtime dependencies. Install them with "
+            "Error: missing runtime dependency "
+            f"`{missing_name}`. Reinstall the project dependencies with "
             "`pip install -r requirements.txt` and try again.",
             file=sys.stderr,
         )
