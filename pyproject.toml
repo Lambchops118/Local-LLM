@@ -13,7 +13,7 @@ authors = [
 ]
 dependencies = [
   "torch>=2.3",
-  "transformers>=4.50.0",
+  "transformers>=5.5.0",
   "accelerate>=0.34",
   "huggingface_hub>=0.24",
   "safetensors>=0.4",

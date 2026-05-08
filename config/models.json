@@ -224,6 +224,46 @@
         "do_sample": true,
         "repetition_penalty": 1.05
       }
+    },
+    "gemma_4_e4b_it": {
+      "label": "Google Gemma 4 E4B Instruct",
+      "model_id": "google/gemma-4-E4B-it",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 384,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
+    },
+    "gemma_4_26b_a4b_it": {
+      "label": "Google Gemma 4 26B A4B Instruct",
+      "model_id": "google/gemma-4-26B-A4B-it",
+      "backend": "transformers",
+      "system_prompt": "You are a helpful, concise assistant running entirely on the user's Mac.",
+      "torch_dtype": "float16",
+      "device_preference": [
+        "mps",
+        "cpu"
+      ],
+      "local_files_only": false,
+      "max_context_messages": null,
+      "generation": {
+        "max_new_tokens": 256,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "do_sample": true,
+        "repetition_penalty": 1.05
+      }
     }
   }
 }

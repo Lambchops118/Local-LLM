@@ -28,6 +28,35 @@ from .base import (
 )
 
 
+def load_tokenizer_with_compat_fallback(model_ref, *, local_files_only: bool):
+    try:
+        return AutoTokenizer.from_pretrained(
+            model_ref,
+            local_files_only=local_files_only,
+        )
+    except AttributeError as exc:
+        # Some newer multimodal Gemma tokenizer configs ship
+        # `extra_special_tokens` as a list, while the fast tokenizer path
+        # expects a mapping. For this text-only CLI, dropping that field is
+        # enough to keep text chat working.
+        if "'list' object has no attribute 'keys'" not in str(exc):
+            raise
+        return AutoTokenizer.from_pretrained(
+            model_ref,
+            local_files_only=local_files_only,
+            extra_special_tokens={},
+        )
+
+
+def is_unknown_model_architecture_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return (
+        "does not recognize this architecture" in message
+        or "unrecognized configuration class" in message
+        or "model type `gemma4`" in message
+    )
+
+
 def select_device(device_preference: list[str]) -> torch.device:
     normalized = [item.lower() for item in device_preference]
     for candidate in normalized:
@@ -97,7 +126,7 @@ class TransformersChatModel(BaseChatModel):
                     local_files_only=True,
                 )
 
-            tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer = load_tokenizer_with_compat_fallback(
                 model_ref,
                 local_files_only=local_files_only,
             )
@@ -142,6 +171,15 @@ class TransformersChatModel(BaseChatModel):
                     "exists in your local Hugging Face cache. If the model is already "
                     "downloaded, rerun with `--local-files-only`."
                 ) from exc
+        except ValueError as exc:
+            if is_unknown_model_architecture_error(exc):
+                raise ModelLoadError(
+                    "This installed `transformers` version is too old for this model "
+                    "architecture. Gemma 4 models require a newer Transformers build. "
+                    "Upgrade with `pip install --upgrade 'transformers>=5.5.0'` inside "
+                    "your virtual environment, then retry."
+                ) from exc
+            raise
 
         model.to(device)
         model.eval()
