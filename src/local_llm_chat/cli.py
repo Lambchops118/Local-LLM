@@ -65,6 +65,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--system-prompt",
         help="Override the configured system prompt for this session only.",
     )
+    thinking_group = parser.add_mutually_exclusive_group()
+    thinking_group.add_argument(
+        "--thinking",
+        dest="enable_thinking",
+        action="store_true",
+        default=None,
+        help="Enable model thinking mode when the tokenizer chat template supports it.",
+    )
+    thinking_group.add_argument(
+        "--no-thinking",
+        dest="enable_thinking",
+        action="store_false",
+        help="Disable model thinking mode when the tokenizer chat template supports it.",
+    )
     parser.add_argument(
         "--local-files-only",
         action="store_true",
@@ -353,6 +367,8 @@ def main() -> None:
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
         if args.system_prompt is not None:
             settings.system_prompt = args.system_prompt
+        if args.enable_thinking is not None:
+            settings.chat_template_options["enable_thinking"] = args.enable_thinking
         model = load_chat_model(settings)
     except (ModelLoadError, KeyError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

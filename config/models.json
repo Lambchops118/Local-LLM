@@ -237,6 +237,9 @@
       ],
       "local_files_only": false,
       "max_context_messages": null,
+      "chat_template_options": {
+        "enable_thinking": false
+      },
       "generation": {
         "max_new_tokens": 384,
         "temperature": 0.7,
@@ -257,6 +260,9 @@
       ],
       "local_files_only": false,
       "max_context_messages": null,
+      "chat_template_options": {
+        "enable_thinking": false
+      },
       "generation": {
         "max_new_tokens": 256,
         "temperature": 0.7,

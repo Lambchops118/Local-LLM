@@ -20,6 +20,7 @@ from transformers import (
 
 from ..config import GenerationSettings, ModelSettings
 from .base import (
+    apply_chat_template_with_options,
     BaseChatModel,
     ModelLoadError,
     fold_system_messages_into_user_prompt,
@@ -222,8 +223,10 @@ class TransformersChatModel(BaseChatModel):
         )
 
         try:
-            inputs = self.tokenizer.apply_chat_template(
+            inputs = apply_chat_template_with_options(
+                self.tokenizer,
                 prepared_messages,
+                self.settings,
                 tokenize=True,
                 add_generation_prompt=True,
                 return_dict=True,
@@ -235,8 +238,10 @@ class TransformersChatModel(BaseChatModel):
 
             self.supports_system_role = False
             fallback_messages = fold_system_messages_into_user_prompt(messages)
-            inputs = self.tokenizer.apply_chat_template(
+            inputs = apply_chat_template_with_options(
+                self.tokenizer,
                 fallback_messages,
+                self.settings,
                 tokenize=True,
                 add_generation_prompt=True,
                 return_dict=True,

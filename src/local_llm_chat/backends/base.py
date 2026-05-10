@@ -96,6 +96,33 @@ def iter_word_chunks(fragments: Iterable[str]) -> Iterator[str]:
         yield buffer
 
 
+def _formatted_chat_template_option_names(option_names: Iterable[str]) -> str:
+    return ", ".join(f"`{name}`" for name in sorted(option_names))
+
+
+def apply_chat_template_with_options(
+    tokenizer,
+    messages: list[dict[str, str]],
+    settings: ModelSettings,
+    **kwargs,
+):
+    try:
+        return tokenizer.apply_chat_template(
+            messages,
+            **kwargs,
+            **settings.chat_template_options,
+        )
+    except TypeError as exc:
+        option_names = settings.chat_template_options.keys()
+        if option_names and "unexpected keyword argument" in str(exc):
+            formatted_names = _formatted_chat_template_option_names(option_names)
+            raise RuntimeError(
+                "This tokenizer chat template does not support the configured "
+                f"chat template option(s): {formatted_names}."
+            ) from exc
+        raise
+
+
 class BaseChatModel(ABC):
     def __init__(self, settings: ModelSettings) -> None:
         self.settings = settings

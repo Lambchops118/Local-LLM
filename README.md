@@ -164,6 +164,7 @@ Key fields:
 
 - `backend`: `transformers` or `mlx`
 - `model_id`: Hugging Face repo or local model path
+- `chat_template_options`: optional template-level controls such as `enable_thinking`
 - `backend_options`: backend-specific tuning knobs
 
 The Gemma 3 MLX profiles use the same prompt-cache and KV-cache tuning approach as the optimized Gemma 2 9B profile:
@@ -177,6 +178,17 @@ The Gemma 3 MLX profiles use the same prompt-cache and KV-cache tuning approach 
     "kv_bits": 4,
     "kv_group_size": 64,
     "quantized_kv_start": 1024
+  }
+}
+```
+
+Profiles can also define reusable chat-template defaults:
+
+```json
+{
+  "model_id": "google/gemma-4-E4B-it",
+  "chat_template_options": {
+    "enable_thinking": false
   }
 }
 ```
@@ -198,9 +210,15 @@ local-llm-chat --model-profile gemma_4_e4b_it
 local-llm-chat --model-profile gemma_4_26b_a4b_it
 local-llm-chat --local-files-only
 local-llm-chat --offline
+local-llm-chat --thinking
+local-llm-chat --no-thinking
 local-llm-chat --max-new-tokens 128
 local-llm-chat --temperature 0.2 --top-p 0.9
 ```
+
+- `--thinking` enables model thinking mode when the active tokenizer chat template supports it.
+- `--no-thinking` disables model thinking mode when supported.
+- The Gemma 4 profiles default to `enable_thinking: false` for faster responses, and you can opt back in with `--thinking`.
 
 ## Managing Downloaded Models
 

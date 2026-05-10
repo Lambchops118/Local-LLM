@@ -12,6 +12,7 @@ from requests.exceptions import RequestException
 
 from ..config import GenerationSettings, ModelSettings
 from .base import (
+    apply_chat_template_with_options,
     BaseChatModel,
     ModelLoadError,
     clone_messages,
@@ -250,8 +251,10 @@ class MlxChatModel(BaseChatModel):
         )
 
         try:
-            prompt = self.tokenizer.apply_chat_template(
+            prompt = apply_chat_template_with_options(
+                self.tokenizer,
                 prepared_messages,
+                self.settings,
                 tokenize=False,
                 add_generation_prompt=True,
             )
@@ -261,8 +264,10 @@ class MlxChatModel(BaseChatModel):
 
             self.supports_system_role = False
             fallback_messages = fold_system_messages_into_user_prompt(messages)
-            prompt = self.tokenizer.apply_chat_template(
+            prompt = apply_chat_template_with_options(
+                self.tokenizer,
                 fallback_messages,
+                self.settings,
                 tokenize=False,
                 add_generation_prompt=True,
             )

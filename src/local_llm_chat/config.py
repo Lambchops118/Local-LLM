@@ -40,6 +40,7 @@ class ModelSettings:
     local_files_only: bool
     max_context_messages: Optional[int]
     generation: GenerationSettings
+    chat_template_options: dict[str, Any] = field(default_factory=dict)
     backend_options: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -58,6 +59,7 @@ class ModelSettings:
             device_preference=list(payload.get("device_preference", ["mps", "cpu"])),
             local_files_only=bool(payload.get("local_files_only", False)),
             max_context_messages=payload.get("max_context_messages"),
+            chat_template_options=dict(payload.get("chat_template_options", {})),
             backend_options=dict(payload.get("backend_options", {})),
             generation=GenerationSettings.from_dict(payload.get("generation", {})),
         )
